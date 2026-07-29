@@ -9,6 +9,7 @@ import {
   decideLedgerSettlementAction,
   openDisputeAction,
   proposeLedgerSettlementAction,
+  recordLedgerPaymentAction,
   recordLedgerReceiptAction,
 } from "@/lib/portal/actions";
 import type { LedgerEntryView } from "@/lib/portal/types";
@@ -24,6 +25,7 @@ type Props = {
 const rowActionHints = {
   confirmSettlement: "ledger-confirm-settlement",
   declarePaid: "ledger-declare-paid",
+  markPaid: "ledger-mark-paid",
   markReceived: "ledger-mark-received",
 } as const;
 
@@ -60,12 +62,25 @@ export function LedgerRecordDetails({ entries, userCompanyId, live, error }: Pro
           userCompanyId !== null &&
           entry.creditorCompanyId === userCompanyId &&
           entry.settlementProposal !== null;
+        const canRecordPayment =
+          live &&
+          (entry.statusCode === "payable" || entry.statusCode === "included_in_statement") &&
+          userCompanyId !== null &&
+          entry.debtorCompanyId === userCompanyId;
         const isPayable = entry.statusCode === "payable";
         const isParty =
           userCompanyId !== null && (entry.debtorCompanyId === userCompanyId || entry.creditorCompanyId === userCompanyId);
 
-        const primaryAction =
-          canDecide ? rowActionHints.confirmSettlement : canRecordReceipt ? rowActionHints.markReceived : canPropose ? rowActionHints.declarePaid : null;
+        // A stalled proposal is the deadlock case, so lead with "Mark paid" there.
+        const primaryAction = canDecide
+          ? rowActionHints.confirmSettlement
+          : canRecordReceipt
+            ? rowActionHints.markReceived
+            : canPropose
+              ? rowActionHints.declarePaid
+              : canRecordPayment
+                ? rowActionHints.markPaid
+                : null;
 
         const noActionReason = !live
           ? "Actions are unavailable while disconnected."
@@ -73,9 +88,7 @@ export function LedgerRecordDetails({ entries, userCompanyId, live, error }: Pro
             ? "No action for this company."
             : !isPayable
               ? "Settled"
-              : entry.debtorCompanyId === userCompanyId && entry.settlementProposal !== null
-                ? "Awaiting counterparty"
-                : "No quick action";
+              : "No quick action";
 
         return (
           <>
@@ -112,6 +125,12 @@ export function LedgerRecordDetails({ entries, userCompanyId, live, error }: Pro
                   label="Declare paid"
                   onActivate={() => openRecord(entry.id, rowActionHints.declarePaid)}
                 />
+              ) : primaryAction === rowActionHints.markPaid ? (
+                <RowAction
+                  mode="open"
+                  label="Mark paid"
+                  onActivate={() => openRecord(entry.id, rowActionHints.markPaid)}
+                />
               ) : (
                 <RowAction reason={noActionReason} />
               )}
@@ -137,13 +156,20 @@ export function LedgerRecordDetails({ entries, userCompanyId, live, error }: Pro
           userCompanyId !== null &&
           entry.creditorCompanyId === userCompanyId &&
           entry.settlementProposal !== null;
+        const canRecordPayment =
+          live &&
+          (entry.statusCode === "payable" || entry.statusCode === "included_in_statement") &&
+          userCompanyId !== null &&
+          entry.debtorCompanyId === userCompanyId;
         const canOpenDispute =
           live &&
           entry.statusCode !== "disputed" &&
           userCompanyId !== null &&
           (entry.debtorCompanyId === userCompanyId || entry.creditorCompanyId === userCompanyId);
         const receiptActionFocus =
-          rowActionHint === rowActionHints.markReceived || rowActionHint === rowActionHints.declarePaid;
+          rowActionHint === rowActionHints.markReceived ||
+          rowActionHint === rowActionHints.declarePaid ||
+          rowActionHint === rowActionHints.markPaid;
         return (
           <div className="record-detail-panel-content">
             {error ? <p className="auth-error" role="alert">{error}</p> : null}
@@ -241,6 +267,44 @@ export function LedgerRecordDetails({ entries, userCompanyId, live, error }: Pro
                 <button className="primary-button full-width" type="submit" disabled={!live}>
                   Record money received
                 </button>
+              </form>
+            ) : null}
+
+            {canRecordPayment ? (
+              <form action={recordLedgerPaymentAction} className="action-form">
+                <input type="hidden" name="ledgerEntryId" value={entry.id} />
+                <input type="hidden" name="returnPath" value="/ledger" />
+                <label>
+                  <span>Paid on</span>
+                  <input
+                    type="date"
+                    className="text-field"
+                    name="paidOn"
+                    required
+                    defaultValue={entry.settlementProposal?.paidOn ?? undefined}
+                    data-record-action-focus={
+                      receiptActionFocus && rowActionHint === rowActionHints.markPaid
+                        ? `${entry.id}:${rowActionHint}`
+                        : undefined
+                    }
+                  />
+                </label>
+                <label>
+                  <span>Payment reference</span>
+                  <input
+                    className="text-field"
+                    name="reference"
+                    placeholder="Optional"
+                    defaultValue={entry.settlementProposal?.reference ?? undefined}
+                  />
+                </label>
+                <button className="primary-button full-width" type="submit" disabled={!live}>
+                  Mark paid without confirmation
+                </button>
+                <p className="detail-hint">
+                  Settles this entry now and notifies the counterparty, who can still open a dispute afterwards. Use
+                  this when they cannot confirm it themselves.
+                </p>
               </form>
             ) : null}
 

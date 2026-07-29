@@ -361,6 +361,38 @@ export async function recordLedgerReceiptAction(formData: FormData) {
   redirect(returnPath);
 }
 
+export async function recordLedgerPaymentAction(formData: FormData) {
+  requireLivePortal();
+  const returnPath = parsePath(formData, "/ledger");
+
+  const ledgerEntryId = z.string().uuid().safeParse(formData.get("ledgerEntryId"));
+  const paidOn = z.string().trim().min(10).max(10).safeParse(formData.get("paidOn"));
+  const reference = optionalTrimmedField(formData.get("reference"), 120);
+
+  if (!ledgerEntryId.success) {
+    return redirectWithError(returnPath, "Select a valid ledger entry.");
+  }
+
+  if (!paidOn.success) {
+    return redirectWithError(returnPath, "Enter a valid payment paid-on date.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("record_ledger_payment", {
+    p_entry_id: ledgerEntryId.data,
+    p_paid_on: paidOn.data,
+    p_reference: reference ?? null,
+  });
+
+  if (error) {
+    return redirectWithError(returnPath, error.message);
+  }
+
+  revalidatePath("/ledger");
+  revalidatePath("/");
+  redirect(returnPath);
+}
+
 export async function decideLedgerSettlementAction(formData: FormData) {
   requireLivePortal();
   const returnPath = parsePath(formData, "/ledger");
