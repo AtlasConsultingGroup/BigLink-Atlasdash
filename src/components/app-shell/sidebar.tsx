@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PortalUser } from "@/lib/portal/types";
+import { LinkedInPortalLink } from "./linkedin-portal-link";
 
 type SidebarNavItem = {
   label: string;
@@ -107,6 +108,7 @@ export function Sidebar({
         {navigation.map((item) => (
           <NavLink key={item.href} item={item} activeHref={activeHref} />
         ))}
+        <LinkedInPortalLink className="min-h-10 rounded-md px-3 text-sm font-medium transition-colors text-neutral-600 hover:bg-neutral-100 hover:text-ink" />
       </nav>
 
       <nav className="sidebar-nav sidebar-nav-secondary" aria-label="Account navigation">

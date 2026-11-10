@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bell, ChevronDown, Menu } from "lucide-react";
 import type { PortalUser } from "@/lib/portal/types";
+import { LinkedInPortalLink } from "./linkedin-portal-link";
 
 export function Topbar({ user }: { user: PortalUser }) {
   return (
@@ -17,6 +18,7 @@ export function Topbar({ user }: { user: PortalUser }) {
           <Link href="/invoices">Invoices</Link>
           <Link href="/disputes">Disputes</Link>
           <Link href="/statements">Monthly close</Link>
+          <LinkedInPortalLink />
         </nav>
       </details>
 
